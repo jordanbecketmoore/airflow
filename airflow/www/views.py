@@ -71,7 +71,7 @@ from pendulum.datetime import DateTime
 from pendulum.parsing.exceptions import ParserError
 from pygments import highlight, lexers
 from pygments.formatters import HtmlFormatter
-from sqlalchemy import Date, and_, case, desc, func, inspect, union_all
+from sqlalchemy import Date, and_, or_, case, desc, func, inspect, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from wtforms import SelectField, validators
@@ -815,10 +815,11 @@ class Airflow(AirflowBaseView):
             import_errors = session.query(errors.ImportError).order_by(errors.ImportError.id)
 
             if (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG) not in user_permissions:
+                # locate orphaned import errors
                 # if the user doesn't have access to all DAGs, only display errors from visible DAGs
-                import_errors = import_errors.join(
+                import_errors = import_errors.outerjoin(
                     DagModel, DagModel.fileloc == errors.ImportError.filename
-                ).filter(DagModel.dag_id.in_(filter_dag_ids))
+                ).filter(or_(DagModel.dag_id.in_(filter_dag_ids), DagModel.dag_id == None))
 
             for import_error in import_errors:
                 flash(
